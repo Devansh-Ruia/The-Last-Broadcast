@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { audioManager } from '../services/audioManager';
 
 interface VUMeterProps {
   label: string;
@@ -6,14 +7,23 @@ interface VUMeterProps {
 
 const VUMeter = ({ label }: VUMeterProps) => {
   const [level, setLevel] = useState(0);
+  const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Simulate audio levels with random fluctuations
-    const interval = setInterval(() => {
-      setLevel(Math.random() * 100);
-    }, 100);
+    // Real-time audio level monitoring
+    const updateLevel = () => {
+      const audioLevel = audioManager.getVolumeLevel();
+      setLevel(audioLevel);
+      animationRef.current = requestAnimationFrame(updateLevel);
+    };
 
-    return () => clearInterval(interval);
+    updateLevel();
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, []);
 
   const getNeedleRotation = () => {

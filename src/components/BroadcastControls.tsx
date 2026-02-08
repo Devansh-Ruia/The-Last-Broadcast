@@ -1,5 +1,6 @@
 import { useGameStore } from '../stores/gameStore';
 import { gameEngine } from '../engine/GameEngine';
+import { audioManager } from '../services/audioManager';
 import type { PlayerChoice } from '../types';
 
 const BroadcastControls = () => {
@@ -9,6 +10,9 @@ const BroadcastControls = () => {
     if (!currentCaller || isProcessing) return;
     
     setIsProcessing(true);
+    
+    // Play button click sound
+    audioManager.playButtonClick();
     
     // Process the choice through game engine
     gameEngine.processPlayerChoice(choice);

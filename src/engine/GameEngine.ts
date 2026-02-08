@@ -1,6 +1,8 @@
 import { useGameStore } from '../stores/gameStore';
 import { useWorldStore } from '../stores/worldStore';
 import { mistralService } from '../services/mistral';
+import { audioManager } from '../services/audioManager';
+import { narrativeDirector } from './NarrativeDirector';
 import type { Caller, PlayerChoice } from '../types';
 
 class GameEngine {
@@ -13,6 +15,9 @@ class GameEngine {
     
     setPhase('broadcasting');
     
+    // Play broadcast start sound
+    audioManager.playBroadcastStart();
+    
     // Start first caller after a short delay
     setTimeout(() => {
       this.nextRound();
@@ -21,7 +26,7 @@ class GameEngine {
 
   // Move to next round/caller
   async nextRound() {
-    const { currentRound, setPhase, clearConversation } = useGameStore.getState();
+    const { currentRound, clearConversation } = useGameStore.getState();
 
     if (currentRound > this.maxRounds) {
       this.endGame();
@@ -31,13 +36,40 @@ class GameEngine {
     // Clear previous conversation
     clearConversation();
     
-    // Generate new caller
-    const worldState = useWorldStore.getState();
-    const caller = await mistralService.generateCaller(worldState, currentRound);
+    // Trigger narrative event for this round
+    await narrativeDirector.triggerNarrativeEvent(currentRound);
     
-    // Set current caller and move to caller phase
-    useGameStore.getState().setCurrentCaller(caller);
-    setPhase('caller-connected');
+    // Special handling for final round (The Watcher)
+    if (currentRound === this.maxRounds) {
+      await this.generateFinalCaller();
+    } else {
+      // Generate regular caller with narrative adjustments
+      const worldState = useWorldStore.getState();
+      const baseCaller = await mistralService.generateCaller(worldState, currentRound);
+      const adjustedCaller = narrativeDirector.adjustCallerForTension(baseCaller, currentRound);
+      
+      // Ensure caller has all required fields
+      const finalCaller: Caller = {
+        id: adjustedCaller.id || `caller_${Date.now()}`,
+        name: adjustedCaller.name || 'Unknown Caller',
+        age: adjustedCaller.age || 30,
+        archetype: adjustedCaller.archetype || 'desperate_parent',
+        backstory: adjustedCaller.backstory || 'No backstory available',
+        motivation: adjustedCaller.motivation || 'survival',
+        secret: adjustedCaller.secret || 'no secret',
+        trustworthiness: adjustedCaller.trustworthiness || 0.5,
+        emotionalState: adjustedCaller.emotionalState || 'neutral',
+        voiceId: adjustedCaller.voiceId || 'rachel',
+        portrait: adjustedCaller.portrait || '',
+        referencesToPast: adjustedCaller.referencesToPast || [],
+        isLying: adjustedCaller.isLying || false,
+        lieDetails: adjustedCaller.lieDetails || '',
+      };
+      
+      // Set current caller and move to caller phase
+      useGameStore.getState().setCurrentCaller(finalCaller);
+      useGameStore.getState().setPhase('caller-connected');
+    }
     
     // Simulate phone ringing
     setTimeout(() => {
@@ -45,11 +77,42 @@ class GameEngine {
     }, 1000);
   }
 
+  // Generate the final caller (The Watcher)
+  private async generateFinalCaller() {
+    const worldState = useWorldStore.getState();
+    const finalCaller = await narrativeDirector.generateFinalCaller(worldState);
+    
+    // Ensure final caller has all required fields
+    const completeFinalCaller: Caller = {
+      id: finalCaller.id || 'the_watcher',
+      name: finalCaller.name || 'The Watcher',
+      age: finalCaller.age || 999,
+      archetype: finalCaller.archetype || 'the_watcher',
+      backstory: finalCaller.backstory || 'I have been watching since the beginning.',
+      motivation: finalCaller.motivation || 'to judge your choices',
+      secret: finalCaller.secret || 'I am not what I appear to be',
+      trustworthiness: 0, // The Watcher is mysterious
+      emotionalState: finalCaller.emotionalState || 'omniscient',
+      voiceId: finalCaller.voiceId || 'ErXwobaYiN019PkySvjV',
+      portrait: finalCaller.portrait || '',
+      referencesToPast: finalCaller.referencesToPast || [],
+      isLying: finalCaller.isLying !== false,
+      lieDetails: finalCaller.lieDetails || 'I am not human',
+    };
+    
+    // Set final caller and move to caller phase
+    useGameStore.getState().setCurrentCaller(completeFinalCaller);
+    useGameStore.getState().setPhase('caller-connected');
+  }
+
   // Simulate incoming call
   private simulateIncomingCall() {
     const { currentCaller, addMessage } = useGameStore.getState();
     
     if (!currentCaller) return;
+
+    // Play caller connection sequence
+    audioManager.playCallerConnection(currentCaller);
 
     // Add initial caller message
     setTimeout(() => {
@@ -67,6 +130,9 @@ class GameEngine {
           text: this.getCallerIntro(currentCaller),
           timestamp: Date.now(),
         });
+
+        // Speak the intro with TTS
+        audioManager.speakText(this.getCallerIntro(currentCaller), currentCaller.voiceId);
       }, 1500);
     }, 500);
   }
@@ -92,6 +158,9 @@ class GameEngine {
 
     setIsProcessing(true);
 
+    // Play button click sound
+    audioManager.playButtonClick();
+
     // Get AI response
     const response = await mistralService.generateCallerResponse(
       currentCaller,
@@ -102,64 +171,55 @@ class GameEngine {
     // Add AI response to conversation
     setTimeout(() => {
       addMessage({
-        id: `caller_${Date.now()}`,
+        id: `caller_${Date.now()}_response`,
         speaker: 'caller',
         text: response.speech,
         timestamp: Date.now(),
-        emotionalState: response.emotionalShift,
       });
 
+      // Speak the response with TTS
+      audioManager.speakText(response.speech, currentCaller.voiceId);
+
       setIsProcessing(false);
-    }, 1000 + Math.random() * 2000); // Simulate thinking time
+    }, 1000);
   }
 
   // Process player's final choice
   async processPlayerChoice(choice: PlayerChoice) {
     const { currentCaller, setIsProcessing, addMessage } = useGameStore.getState();
     const { 
-      updateReputation, 
       addCallerOutcome, 
-      addEvent, 
-      setCityCondition,
-      addBroadcastedClaim 
+      addBroadcastedClaim,
     } = useWorldStore.getState();
 
     if (!currentCaller) return;
 
     setIsProcessing(true);
 
-    // Process choice through AI
-    const worldState = useWorldStore.getState();
-    const result = await mistralService.processPlayerChoice(choice, currentCaller, worldState);
+    // Play button click sound
+    audioManager.playButtonClick();
 
-    // Update world state
-    if (result.worldUpdates) {
-      // Apply world updates
-      if (result.worldUpdates.cityCondition) {
-        setCityCondition(result.worldUpdates.cityCondition);
-      }
-      
-      if (result.worldUpdates.playerReputation) {
-        updateReputation(result.worldUpdates.playerReputation);
-      }
-    }
-
-    // Add news ticker event
-    addEvent({
-      id: `event_${Date.now()}`,
-      description: result.newsTickerLine,
-      impact: choice === 'broadcast' ? 'positive' : choice === 'ignore' ? 'negative' : 'neutral',
+    // Determine outcome based on choice
+    const survived = choice !== 'ignore' && choice !== 'expose';
+    
+    // Add outcome message
+    const outcomeMessage = this.getChoiceResultMessage(choice, currentCaller, survived);
+    addMessage({
+      id: `outcome_${Date.now()}`,
+      speaker: 'player',
+      text: outcomeMessage,
       timestamp: Date.now(),
-      affectedFactions: ['survivors'],
     });
 
+    // Speak outcome with TTS
+    audioManager.speakText(outcomeMessage, currentCaller.voiceId);
+
     // Add to caller history
-    const survived = choice !== 'ignore' && choice !== 'expose';
     addCallerOutcome({
       callerId: currentCaller.id,
       choice,
       survived,
-      impact: result.consequenceDescription,
+      impact: outcomeMessage,
     });
 
     // If broadcast, add to claims
@@ -167,15 +227,12 @@ class GameEngine {
       addBroadcastedClaim(`${currentCaller.name}: ${currentCaller.backstory}`);
     }
 
-    // Add final message
-    addMessage({
-      id: `system_${Date.now()}`,
-      speaker: 'player',
-      text: this.getChoiceResultMessage(choice, currentCaller, survived),
-      timestamp: Date.now(),
-    });
+    // Play caller disconnection sound
+    setTimeout(() => {
+      audioManager.playCallerDisconnection();
+    }, 2000);
 
-    // Move to static break, then next round
+    // Move to static break between callers
     setTimeout(() => {
       const { setPhase, setCurrentRound } = useGameStore.getState();
       setPhase('static-break');
@@ -184,7 +241,7 @@ class GameEngine {
         setCurrentRound(useGameStore.getState().currentRound + 1);
         this.nextRound();
       }, 3000);
-    }, 2000);
+    }, 5000);
   }
 
   // Get message for player's choice
@@ -208,8 +265,20 @@ class GameEngine {
     const { setPhase } = useGameStore.getState();
     const worldState = useWorldStore.getState();
 
-    // Generate final summary
-    await mistralService.generateEndBroadcast(worldState);
+    // Generate final summary using NarrativeDirector
+    const summary = await narrativeDirector.generateEndGameSummary(worldState);
+
+    // Add final message to conversation
+    const { addMessage } = useGameStore.getState();
+    addMessage({
+      id: `final_${Date.now()}`,
+      speaker: 'player',
+      text: summary,
+      timestamp: Date.now(),
+    });
+
+    // Play broadcast end sound
+    audioManager.playBroadcastEnd();
 
     // Move to sign-off screen
     setPhase('sign-off');

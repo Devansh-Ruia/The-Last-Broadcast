@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWorldStore } from '../stores/worldStore';
 
 const NewsTicker = () => {
   const { events, broadcastedClaims } = useWorldStore();
   const [currentText, setCurrentText] = useState('');
   const [position, setPosition] = useState(100);
+  const animationRef = useRef<number | null>(null);
 
   // Generate ticker text from world events and broadcasts
   const generateTickerText = () => {
@@ -27,18 +28,24 @@ const NewsTicker = () => {
   useEffect(() => {
     if (!currentText) return;
 
-    const interval = setInterval(() => {
-      setPosition((prev) => {
-        const newPosition = prev - 0.5;
-        // Reset when text has fully scrolled
-        if (newPosition < -100) {
-          return 100;
+    const animate = () => {
+      setPosition(prev => {
+        if (prev <= -100) {
+          return 100; // Reset position
         }
-        return newPosition;
+        return prev - 0.5; // Scroll speed
       });
-    }, 50);
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
 
-    return () => clearInterval(interval);
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [currentText]);
 
   return (

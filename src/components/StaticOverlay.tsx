@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-const StaticOverlay = () => {
+const StaticOverlay = ({ intensity = 0.3 }: { intensity?: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -18,19 +19,29 @@ const StaticOverlay = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Static animation
+    // Static animation with enhanced effects
     let animationId: number;
     const animate = () => {
+      timeRef.current += 0.01;
       const imageData = ctx.createImageData(canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Generate static noise
+      // Generate animated static with time-based patterns
       for (let i = 0; i < data.length; i += 4) {
-        const noise = Math.random() * 50; // Subtle static
-        data[i] = noise;     // Red
-        data[i + 1] = noise; // Green
-        data[i + 2] = noise; // Blue
-        data[i + 3] = 255;   // Alpha
+        const x = (i / 4) % canvas.width;
+        const y = Math.floor((i / 4) / canvas.width);
+        
+        // Create more complex static patterns
+        const noise1 = Math.random() * 50 * intensity;
+        const noise2 = Math.sin(x * 0.01 + timeRef.current) * 20 * intensity;
+        const noise3 = Math.cos(y * 0.01 + timeRef.current) * 20 * intensity;
+        
+        const combinedNoise = (noise1 + noise2 + noise3) / 3;
+        
+        data[i] = combinedNoise;     // Red
+        data[i + 1] = combinedNoise; // Green
+        data[i + 2] = combinedNoise; // Blue
+        data[i + 3] = 255 * intensity;   // Alpha with intensity
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -49,7 +60,8 @@ const StaticOverlay = () => {
     <div className="fixed inset-0 pointer-events-none z-50">
       <canvas
         ref={canvasRef}
-        className="w-full h-full opacity-30 mix-blend-screen"
+        className="w-full h-full mix-blend-screen"
+        style={{ opacity: intensity }}
       />
       
       {/* Additional overlay for effect */}

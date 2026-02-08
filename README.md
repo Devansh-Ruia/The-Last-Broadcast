@@ -1,68 +1,49 @@
-# The Last Broadcast
+# 🎙️ The Last Broadcast
 
-A single-player narrative horror game where you play as the last radio host alive after the apocalypse. Survivors call in with AI-generated voices, desperate stories, and hidden agendas. You choose who to help, what to broadcast, and what to say on-air. Your words reshape the world, and callers in later rounds react to your earlier choices.
+A post-apocalyptic radio broadcast game where you play as the last radio operator in a dying city, making life-or-death decisions about who to help, who to expose, and whose truth to broadcast.
 
-## Tech Stack
+## 🎮 Game Overview
 
-- **Framework:** React 18 + TypeScript
-- **Build tool:** Vite
-- **Styling:** Tailwind CSS
-- **Audio:** Howler.js for SFX, Web Audio API for radio effects
-- **State management:** Zustand
-- **AI APIs:** Mistral Large 3, ElevenLabs TTS, Neocortex
-- **Deployment:** Vercel
+In a world consumed by static and silence, you are the final voice on the airwaves. As a radio operator in a city on the brink of collapse, you receive desperate calls from survivors, liars, and something else entirely. Each decision you make echoes through the darkness, shaping the fate of those who still listen.
 
-## Game Features
+**Features:**
+- **7-round narrative experience** with tension pacing and atmospheric storytelling
+- **AI-driven caller generation** using Mistral Large 3
+- **Full voice acting** with ElevenLabs TTS integration
+- **Dynamic audio system** with Web Audio API effects and real-time VU meters
+- **Atmospheric visuals** with crossfading backgrounds and lighting effects
+- **Multiple endings** based on your choices and moral compass
 
-- **Dynamic AI Callers:** Each caller is generated with unique backstories, motivations, and secrets
-- **Consequential Choices:** Your decisions affect the city, factions, and future callers
-- **Voice Integration:** AI-generated voices for immersive conversations
-- **Atmospheric UI:** 1970s radio studio aesthetic with real-time VU meters and effects
-- **Branching Narrative:** No two playthroughs are the same
+## 🚀 Quick Start
 
-## Setup Instructions
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Modern web browser with Web Audio API support
 
-1. **Clone and install dependencies:**
-   ```bash
-   git clone <repository-url>
-   cd the-last-broadcast
-   npm install
-   ```
+### Installation
 
-2. **Set up environment variables:**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and add your API keys:
-   ```
-   VITE_MISTRAL_API_KEY=your_mistral_key_here
-   VITE_ELEVENLABS_API_KEY=your_elevenlabs_key_here
-   VITE_NEOCORTEX_API_KEY=your_neocortex_key_here
-   ```
-
-3. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-
-4. **Open your browser and navigate to:** `http://localhost:3000`
-
-## Deployment
-
-Deploy to Vercel with one click:
-
+1. **Clone the repository**
 ```bash
-npx vercel
+git clone https://github.com/your-username/the-last-broadcast.git
+cd the-last-broadcast
 ```
 
-Or connect your repository to Vercel for automatic deployments.
+2. **Install dependencies**
+```bash
+npm install
+```
 
-## Game Controls
+3. **Set up environment variables**
+```bash
+cp .env.example .env
+```
 
-- **Enter Callsign:** Type your radio host name and click "SIGN ON"
-- **Answer Calls:** Click "ANSWER CALL" when a caller connects
-- **Respond:** Type messages and press Enter to speak with callers
+Edit `.env` with your API keys:
+```env
+VITE_MISTRAL_API_KEY=your_mistral_api_key_here
+VITE_ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+```
 - **Make Choices:** After conversations, choose:
   - **BROADCAST:** Share their story on air
   - **HELP:** Give them private advice

@@ -1,10 +1,44 @@
+import { useState, useEffect, useRef } from 'react';
+
 interface WindowViewProps {
   cityCondition: 'burning' | 'foggy' | 'overrun' | 'calm' | 'dark';
 }
 
 const WindowView = ({ cityCondition }: WindowViewProps) => {
-  const getBackgroundImage = () => {
-    switch (cityCondition) {
+  const [previousCondition, setPreviousCondition] = useState(cityCondition);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const animationRef = useRef<number | null>(null);
+
+  // Handle crossfading between city conditions
+  useEffect(() => {
+    if (cityCondition !== previousCondition) {
+      setIsTransitioning(true);
+      
+      // Start crossfade animation
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      
+      const startTime = Date.now();
+      const duration = 2000; // 2 seconds crossfade
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setPreviousCondition(cityCondition);
+          setIsTransitioning(false);
+        }
+      };
+      
+      animate();
+    }
+  }, [cityCondition, previousCondition]);
+  const getBackgroundImage = (condition: string) => {
+    switch (condition) {
       case 'burning':
         return 'linear-gradient(to bottom, #1a0000, #330000, #4d0000)';
       case 'foggy':
@@ -20,8 +54,8 @@ const WindowView = ({ cityCondition }: WindowViewProps) => {
     }
   };
 
-  const getFilterStyle = () => {
-    switch (cityCondition) {
+  const getFilterStyle = (condition: string) => {
+    switch (condition) {
       case 'burning':
         return 'brightness(0.8) contrast(1.2) hue-rotate(-10deg)';
       case 'foggy':
@@ -39,12 +73,25 @@ const WindowView = ({ cityCondition }: WindowViewProps) => {
 
   return (
     <div className="w-full h-full relative overflow-hidden">
-      {/* Background */}
+      {/* Previous background for crossfade */}
+      {isTransitioning && (
+        <div 
+          className="absolute inset-0 transition-opacity duration-2000 ease-in-out"
+          style={{
+            background: getBackgroundImage(previousCondition),
+            filter: getFilterStyle(previousCondition),
+            opacity: isTransitioning ? 0.3 : 0,
+          }}
+        />
+      )}
+      
+      {/* Current background */}
       <div 
         className="absolute inset-0 transition-all duration-2000 ease-in-out"
         style={{
-          background: getBackgroundImage(),
-          filter: getFilterStyle(),
+          background: getBackgroundImage(cityCondition),
+          filter: getFilterStyle(cityCondition),
+          opacity: isTransitioning ? 0.7 : 1,
         }}
       />
       
