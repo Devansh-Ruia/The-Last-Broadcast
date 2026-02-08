@@ -1,0 +1,88 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@400;700;900&display=swap');
+
+@layer base {
+  :root {
+    --radio-amber: 255, 140, 0;
+    --radio-orange: 255, 107, 53;
+    --radio-blue: 30, 58, 138;
+    --radio-black: 10, 10, 10;
+    --radio-gray: 31, 41, 55;
+  }
+
+  * {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: rgb(var(--radio-black));
+    color: rgb(248, 250, 252);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .radio-glow {
+    box-shadow: 0 0 20px rgba(var(--radio-amber), 0.3);
+  }
+
+  .radio-glow-intense {
+    box-shadow: 0 0 40px rgba(var(--radio-amber), 0.6), 0 0 60px rgba(var(--radio-amber), 0.3);
+  }
+
+  .radio-button {
+    @apply bg-gray-900 border border-amber-600 text-amber-400 px-4 py-2 rounded font-mono text-sm transition-all duration-200 hover:bg-amber-900 hover:text-amber-200 hover:border-amber-400 active:scale-95;
+  }
+
+  .radio-button-danger {
+    @apply bg-gray-900 border border-red-600 text-red-400 px-4 py-2 rounded font-mono text-sm transition-all duration-200 hover:bg-red-900 hover:text-red-200 hover:border-red-400 active:scale-95;
+  }
+
+  .radio-panel {
+    @apply bg-gray-950 border border-gray-800 rounded-lg p-4 shadow-2xl;
+  }
+
+  .typewriter {
+    overflow: hidden;
+    white-space: nowrap;
+    animation: typewriter 0.5s steps(40) forwards;
+  }
+}
+
+@layer utilities {
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(var(--radio-amber), 0.5); }
+  100% { box-shadow: 0 0 20px rgba(var(--radio-amber), 0.8), 0 0 30px rgba(var(--radio-amber), 0.4); }
+}
+
+@keyframes typewriter {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
+
+@keyframes static {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+}
