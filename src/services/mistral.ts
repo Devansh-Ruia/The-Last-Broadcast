@@ -1,4 +1,4 @@
-import type { Caller, WorldState, ConversationMessage } from '../types';
+import type { Caller, WorldState } from '../types';
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 const API_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
@@ -127,7 +127,7 @@ Generate a caller now:`;
   async generateCallerResponse(
     caller: Caller, 
     playerMessage: string, 
-    worldState: WorldState
+    _worldState: WorldState
   ): Promise<{ speech: string; emotionalShift: string; newSecretRevealed?: string }> {
     const prompt = `You are ${caller.name}, a ${caller.archetype} calling into the last radio station after the apocalypse. You are ${caller.emotionalState}.
 

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useWorldStore } from '../stores/worldStore';
+import type { CallerOutcome } from '../types';
 
 const SignOffScreen = () => {
   const [isRevealing, setIsRevealing] = useState(false);
-  const { playerCallsign, callerHistory } = useGameStore();
-  const { cityCondition, playerReputation, events } = useWorldStore();
+  const { playerCallsign } = useGameStore();
+  const { cityCondition, playerReputation, events, callerHistory } = useWorldStore();
 
   useEffect(() => {
     // Start revealing content after a short delay
@@ -14,8 +15,8 @@ const SignOffScreen = () => {
   }, []);
 
   const calculateStats = () => {
-    const totalCallers = callerHistory.length;
-    const livesSaved = callerHistory.filter(c => c.survived).length;
+    const totalCallers = callerHistory.filter((c: CallerOutcome) => c).length;
+    const livesSaved = callerHistory.filter((c: CallerOutcome) => c.survived).length;
     const livesLost = totalCallers - livesSaved;
     const truthBroadcast = playerReputation.honesty > 50 ? Math.floor(playerReputation.honesty / 10) : 0;
     const liesBroadcast = playerReputation.honesty < 50 ? Math.floor((50 - playerReputation.honesty) / 10) : 0;
@@ -114,7 +115,7 @@ const SignOffScreen = () => {
           {events.length > 0 && (
             <div className="mb-4">
               <div className="text-amber-400 mb-2">FINAL TRANSMISSION LOG:</div>
-              {events.slice(-3).map((event, i) => (
+              {events.slice(-3).map((event: any, i: number) => (
                 <div key={i} className="mb-1">• {event.description}</div>
               ))}
             </div>

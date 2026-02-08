@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, Caller, ConversationMessage } from '../types';
+import type { GameState, Caller, ConversationMessage } from '../types';
 
 interface GameStore extends GameState {
   // Actions
@@ -22,7 +22,7 @@ const initialState: GameState = {
   isProcessing: false,
 };
 
-export const useGameStore = create<GameStore>((set, get) => ({
+export const useGameStore = create<GameStore>((set) => ({
   ...initialState,
 
   setPhase: (phase) => set({ phase }),

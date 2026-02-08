@@ -31,7 +31,7 @@ const initialWorldState: WorldState = {
   broadcastedClaims: [],
 };
 
-export const useWorldStore = create<WorldStore>((set, get) => ({
+export const useWorldStore = create<WorldStore>((set) => ({
   ...initialWorldState,
 
   setCityCondition: (condition) => set({ cityCondition: condition }),

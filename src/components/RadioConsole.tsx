@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useWorldStore } from '../stores/worldStore';
 import VUMeter from './VUMeter';

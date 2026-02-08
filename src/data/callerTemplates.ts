@@ -47,8 +47,8 @@ export const callerArchetypes = {
 
 export const generateCallerFromArchetype = (
   archetype: keyof typeof callerArchetypes,
-  round: number,
-  worldState: any
+  _round: number,
+  _worldState: any
 ): Partial<Caller> => {
   const template = callerArchetypes[archetype];
   const emotionalState = template.emotionalStates[Math.floor(Math.random() * template.emotionalStates.length)];

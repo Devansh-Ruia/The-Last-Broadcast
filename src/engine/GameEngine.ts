@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useWorldStore } from '../stores/worldStore';
 import { mistralService } from '../services/mistral';
@@ -6,14 +5,13 @@ import type { Caller, PlayerChoice } from '../types';
 
 class GameEngine {
   private maxRounds = 7;
-  private currentCallerTimeout?: NodeJS.Timeout;
+  private currentCallerTimeout?: ReturnType<typeof setTimeout>;
 
   // Start the game loop
   async startGame() {
-    const { setPhase, setCurrentRound } = useGameStore.getState();
+    const { setPhase } = useGameStore.getState();
     
     setPhase('broadcasting');
-    setCurrentRound(1);
     
     // Start first caller after a short delay
     setTimeout(() => {
@@ -23,8 +21,7 @@ class GameEngine {
 
   // Move to next round/caller
   async nextRound() {
-    const { currentRound, setCurrentRound, setPhase, clearConversation } = useGameStore.getState();
-    const { incrementBroadcastNumber } = useWorldStore.getState();
+    const { currentRound, setPhase, clearConversation } = useGameStore.getState();
 
     if (currentRound > this.maxRounds) {
       this.endGame();
@@ -50,7 +47,7 @@ class GameEngine {
 
   // Simulate incoming call
   private simulateIncomingCall() {
-    const { setPhase, currentCaller, addMessage } = useGameStore.getState();
+    const { currentCaller, addMessage } = useGameStore.getState();
     
     if (!currentCaller) return;
 
@@ -191,7 +188,7 @@ class GameEngine {
   }
 
   // Get message for player's choice
-  private getChoiceResultMessage(choice: PlayerChoice, caller: Caller, survived: boolean): string {
+  private getChoiceResultMessage(choice: PlayerChoice, _caller: Caller, survived: boolean): string {
     switch (choice) {
       case 'broadcast':
         return `*Going live on air* ${survived ? 'Your broadcast may help others.' : 'The truth spreads through the darkness.'}`;
@@ -212,36 +209,10 @@ class GameEngine {
     const worldState = useWorldStore.getState();
 
     // Generate final summary
-    const summary = await mistralService.generateEndBroadcast(worldState);
+    await mistralService.generateEndBroadcast(worldState);
 
     // Move to sign-off screen
     setPhase('sign-off');
-  }
-
-  // Handle timeout for no response
-  private handleCallerTimeout() {
-    const { addMessage, setPhase } = useGameStore.getState();
-    
-    addMessage({
-      id: `timeout_${Date.now()}`,
-      speaker: 'caller',
-      text: '*static*...hello? Are you still there? *crackle*',
-      timestamp: Date.now(),
-    });
-
-    // If no response for too long, end call
-    this.currentCallerTimeout = setTimeout(() => {
-      addMessage({
-        id: `timeout_end_${Date.now()}`,
-        speaker: 'caller',
-        text: '*line goes dead*',
-        timestamp: Date.now(),
-      });
-      
-      setTimeout(() => {
-        this.processPlayerChoice('ignore');
-      }, 2000);
-    }, 30000); // 30 seconds timeout
   }
 
   // Clear any pending timeouts
