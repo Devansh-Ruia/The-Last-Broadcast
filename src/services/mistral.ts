@@ -1,8 +1,5 @@
 import type { Caller, WorldState } from '../types';
 
-const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
-const API_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
-
 interface MistralResponse {
   choices: Array<{
     message: {
@@ -12,18 +9,33 @@ interface MistralResponse {
 }
 
 class MistralService {
+  private apiKey: string;
+  private baseUrl: string;
+  private isMockMode: boolean;
+  private hasLoggedMockMode = false;
+
+  constructor() {
+    this.apiKey = import.meta.env.VITE_MISTRAL_API_KEY || '';
+    this.baseUrl = 'https://api.mistral.ai/v1';
+    this.isMockMode = !this.apiKey;
+    
+    if (this.isMockMode && !this.hasLoggedMockMode) {
+      console.info('Running in mock mode — add MISTRAL_API_KEY to .env for full experience');
+      this.hasLoggedMockMode = true;
+    }
+  }
+
   private async makeRequest(prompt: string): Promise<string> {
-    if (!API_KEY) {
-      console.warn('Mistral API key not found, using mock response');
+    if (this.isMockMode) {
       return this.getMockResponse();
     }
 
     try {
-      const response = await fetch(MISTRAL_API_URL, {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`,
+          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           model: 'mistral-large-latest',
@@ -34,11 +46,11 @@ class MistralService {
       });
 
       if (!response.ok) {
-        throw new Error(`Mistral API error: ${response.status}`);
+        throw new Error(`Mistral API error: ${response.status} ${response.statusText}`);
       }
 
       const data: MistralResponse = await response.json();
-      return data.choices[0]?.message?.content || this.getMockResponse();
+      return data.choices[0]?.message?.content || 'No response received';
     } catch (error) {
       console.error('Mistral API error:', error);
       return this.getMockResponse();

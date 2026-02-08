@@ -229,7 +229,7 @@ class GameEngine {
 
     // Play caller disconnection sound
     setTimeout(() => {
-      audioManager.playCallerDisconnection();
+      audioManager.playCallerDisconnect();
     }, 2000);
 
     // Move to static break between callers

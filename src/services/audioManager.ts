@@ -1,292 +1,340 @@
-import { Howl } from 'howler';
-import type { Caller } from '../types';
+import { soundGenerator } from '../utils/soundGenerator';
 
 interface AudioConfig {
   volume: number;
-  fadeIn: number;
-  fadeOut: number;
+  staticVolume: number;
+  voiceVolume: number;
+  effectsVolume: number;
 }
 
 class AudioManager {
   private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
-  private gainNode: GainNode | null = null;
-  private filterNode: BiquadFilterNode | null = null;
-  private currentHowl: Howl | null = null;
+  private staticSource: AudioBufferSourceNode | null = null;
+  private staticGainNode: GainNode | null = null;
+  private staticFilterNode: BiquadFilterNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
+  private masterGainNode: GainNode | null = null;
+  
+  private config: AudioConfig = {
+    volume: 0.7,
+    staticVolume: 0.3,
+    voiceVolume: 0.8,
+    effectsVolume: 0.6,
+  };
 
-  // Sound effects
-  private sounds: Map<string, Howl> = new Map();
+  private soundBuffers: Map<string, AudioBuffer> = new Map();
+  private isInitialized = false;
 
   constructor() {
-    this.initializeAudioContext();
-    this.loadSoundEffects();
+    this.initializeAudio();
+    this.loadSounds();
   }
 
-  private initializeAudioContext() {
+  private async initializeAudio() {
     try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      this.setupAudioNodes();
+      this.audioContext = soundGenerator.getAudioContext();
+      if (!this.audioContext) {
+        console.warn('Audio context not available');
+        return;
+      }
+
+      // Create audio nodes
+      this.analyserNode = this.audioContext.createAnalyser();
+      this.analyserNode.fftSize = 256;
+      this.analyserNode.smoothingTimeConstant = 0.8;
+
+      this.masterGainNode = this.audioContext.createGain();
+      this.masterGainNode.gain.value = this.config.volume;
+
+      // Connect nodes
+      this.masterGainNode.connect(this.analyserNode);
+      this.analyserNode.connect(this.audioContext.destination);
+
+      this.isInitialized = true;
     } catch (error) {
-      console.warn('Web Audio API not supported:', error);
+      console.error('Failed to initialize audio:', error);
     }
   }
 
-  private setupAudioNodes() {
-    if (!this.audioContext) return;
+  private loadSounds() {
+    if (!this.isInitialized) return;
 
-    // Create analyser for VU meters
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 256;
-    this.analyser.smoothingTimeConstant = 0.8;
-
-    // Create gain node for volume control
-    this.gainNode = this.audioContext.createGain();
-    this.gainNode.gain.value = 0.7;
-
-    // Create bandpass filter for radio effect
-    this.filterNode = this.audioContext.createBiquadFilter();
-    this.filterNode.type = 'bandpass';
-    this.filterNode.frequency.value = 1000; // Center frequency
-    this.filterNode.Q.value = 2; // Resonance/bandwidth
-
-    // Connect nodes: source -> filter -> gain -> analyser -> destination
-    this.filterNode.connect(this.gainNode);
-    this.gainNode.connect(this.analyser);
-    this.analyser.connect(this.audioContext.destination);
+    try {
+      // Generate all sound buffers
+      this.soundBuffers.set('static', soundGenerator.generateStatic());
+      this.soundBuffers.set('phone_ring', soundGenerator.generatePhoneRing());
+      this.soundBuffers.set('dial_tone', soundGenerator.generateDialTone());
+      this.soundBuffers.set('connect', soundGenerator.generateConnect());
+      this.soundBuffers.set('disconnect', soundGenerator.generateDisconnect());
+      this.soundBuffers.set('broadcast_start', soundGenerator.generateBroadcastStart());
+      this.soundBuffers.set('broadcast_end', soundGenerator.generateBroadcastEnd());
+      this.soundBuffers.set('button_click', soundGenerator.generateButtonClick());
+    } catch (error) {
+      console.error('Failed to load sounds:', error);
+    }
   }
 
-  private loadSoundEffects() {
-    const soundEffects = {
-      static: '/audio/static.mp3',
-      dial_tone: '/audio/dial_tone.mp3',
-      phone_ring: '/audio/phone_ring.mp3',
-      connect: '/audio/connect.mp3',
-      disconnect: '/audio/disconnect.mp3',
-      button_click: '/audio/button_click.mp3',
-      broadcast_start: '/audio/broadcast_start.mp3',
-      broadcast_end: '/audio/broadcast_end.mp3',
-    };
+  // Play a one-shot sound
+  playSound(soundName: string, volume: number = 1.0): void {
+    if (!this.isInitialized || !this.audioContext) return;
 
-    Object.entries(soundEffects).forEach(([name, path]) => {
-      const sound = new Howl({
-        src: [path],
-        volume: 0.5,
-        preload: true,
-        onload: () => console.log(`Loaded sound: ${name}`),
-        onloaderror: (_id, error) => console.warn(`Failed to load sound ${name}:`, error),
-      });
-      this.sounds.set(name, sound);
-    });
-  }
-
-  // Play sound effects
-  playSound(soundName: string, config: Partial<AudioConfig> = {}) {
-    const sound = this.sounds.get(soundName);
-    if (!sound) {
+    const buffer = this.soundBuffers.get(soundName);
+    if (!buffer) {
       console.warn(`Sound not found: ${soundName}`);
       return;
     }
 
-    const { volume = 0.5, fadeIn = 0 } = config;
-    
-    sound.volume(volume);
-    sound.play();
-
-    if (fadeIn > 0) {
-      sound.fade(0, volume, fadeIn * 1000);
+    try {
+      const source = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
+      
+      source.buffer = buffer;
+      gainNode.gain.value = volume * this.config.effectsVolume;
+      
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode!);
+      
+      source.start(0);
+    } catch (error) {
+      console.error(`Failed to play sound ${soundName}:`, error);
     }
   }
 
-  // Text-to-Speech using ElevenLabs API
-  async speakText(text: string, voiceId: string, config: Partial<AudioConfig> = {}): Promise<void> {
-    const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
-    if (!apiKey) {
-      console.warn('ElevenLabs API key not found, using fallback');
-      this.fallbackTTS(text);
-      return;
-    }
+  // Play static with radio filter
+  playStatic(): void {
+    if (!this.isInitialized || !this.audioContext) return;
+
+    // Stop existing static
+    this.stopStatic();
 
     try {
-      // Stop any current playback
-      this.stopCurrentSpeech();
+      const staticBuffer = this.soundBuffers.get('static');
+      if (!staticBuffer) return;
 
-      // Generate audio from ElevenLabs
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.75,
-          },
-        }),
-      });
+      this.staticSource = this.audioContext.createBufferSource();
+      this.staticGainNode = this.audioContext.createGain();
+      this.staticFilterNode = this.audioContext.createBiquadFilter();
 
-      if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.statusText}`);
-      }
+      // Configure bandpass filter for radio static (300-3400Hz)
+      this.staticFilterNode.type = 'bandpass';
+      this.staticFilterNode.frequency.value = 1850; // Center frequency
+      this.staticFilterNode.Q.value = 1; // Bandwidth
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      // Create Howl instance for the generated audio
-      const { volume = 0.7, fadeIn = 0.5 } = config;
+      this.staticSource.buffer = staticBuffer;
+      this.staticSource.loop = true;
       
-      this.currentHowl = new Howl({
-        src: [audioUrl],
-        volume: 0,
-        html5: true,
-        onload: () => {
-          if (fadeIn > 0) {
-            this.currentHowl?.fade(0, volume, fadeIn * 1000);
-          } else {
-            this.currentHowl?.volume(volume);
-          }
-        },
-        onend: () => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentHowl = null;
-        },
-        onloaderror: (_id, error) => {
-          console.error('Error loading TTS audio:', error);
-          URL.revokeObjectURL(audioUrl);
-          this.currentHowl = null;
-        },
-      });
+      this.staticGainNode.gain.value = this.config.staticVolume;
 
-      this.currentHowl.play();
+      // Connect nodes
+      this.staticSource.connect(this.staticFilterNode!);
+      this.staticFilterNode.connect(this.staticGainNode!);
+      this.staticGainNode.connect(this.masterGainNode!);
 
-      // Connect to Web Audio API for effects
-      // Note: Full Web Audio integration would require accessing Howl's audio source
-      // For now, we use the analyser for VU meter visualization
-
+      this.staticSource.start(0);
     } catch (error) {
-      console.error('TTS error:', error);
-      this.fallbackTTS(text);
+      console.error('Failed to play static:', error);
     }
   }
 
-  // Fallback TTS using browser's speech synthesis
-  private fallbackTTS(text: string) {
+  // Stop static
+  stopStatic(): void {
+    if (this.staticSource) {
+      try {
+        this.staticSource.stop();
+        this.staticSource.disconnect();
+      } catch (error) {
+        // Source might already be stopped
+      }
+      this.staticSource = null;
+    }
+
+    if (this.staticGainNode) {
+      this.staticGainNode.disconnect();
+      this.staticGainNode = null;
+    }
+
+    if (this.staticFilterNode) {
+      this.staticFilterNode.disconnect();
+      this.staticFilterNode = null;
+    }
+  }
+
+  // Get volume level for VU meters
+  getVolumeLevel(): number {
+    if (!this.analyserNode) return 0;
+    
+    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteFrequencyData(dataArray);
+    
+    // Calculate average volume level
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    
+    return sum / dataArray.length / 255; // Normalize to 0-1
+  }
+
+  // Play TTS audio from ElevenLabs
+  playTTS(audioBuffer: ArrayBuffer): void {
+    if (!this.isInitialized || !this.audioContext) return;
+
+    try {
+      this.audioContext.decodeAudioData(audioBuffer.slice(0))
+        .then(buffer => {
+          const source = this.audioContext!.createBufferSource();
+          const gainNode = this.audioContext!.createGain();
+          
+          source.buffer = buffer;
+          gainNode.gain.value = this.config.voiceVolume;
+          
+          source.connect(gainNode);
+          gainNode.connect(this.masterGainNode!);
+          
+          source.start(0);
+        })
+        .catch(error => {
+          console.error('Failed to decode TTS audio:', error);
+        });
+    } catch (error) {
+      console.error('Failed to play TTS:', error);
+    }
+  }
+
+  // Speak text using TTS (placeholder for ElevenLabs integration)
+  async speakText(text: string, _voiceId: string): Promise<void> {
+    // This would integrate with ElevenLabs API
+    // For now, we'll use browser speech synthesis as fallback
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
-      utterance.volume = 0.7;
+      utterance.volume = this.config.voiceVolume;
+      
       speechSynthesis.speak(utterance);
-    } else {
-      console.warn('Speech synthesis not supported');
     }
   }
 
-  // Stop current speech
-  stopCurrentSpeech() {
-    if (this.currentHowl) {
-      this.currentHowl.stop();
-      this.currentHowl.unload();
-      this.currentHowl = null;
-    }
-    
-    if ('speechSynthesis' in window) {
-      speechSynthesis.cancel();
-    }
+  // Get analyser node for VU meters
+  getAnalyserNode(): AnalyserNode | null {
+    return this.analyserNode;
   }
 
-  // Get audio data for VU meter visualization
-  getAudioData(): Uint8Array | null {
-    if (!this.analyser) return null;
+  // Get frequency data for visualization
+  getFrequencyData(): Uint8Array {
+    if (!this.analyserNode) {
+      return new Uint8Array(128);
+    }
 
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
+    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteFrequencyData(dataArray);
     return dataArray;
   }
 
-  // Get average volume level for VU meter
-  getVolumeLevel(): number {
-    const audioData = this.getAudioData();
-    if (!audioData) return 0;
+  // Get time domain data for waveform
+  getWaveformData(): Uint8Array {
+    if (!this.analyserNode) {
+      return new Uint8Array(128);
+    }
 
-    const sum = audioData.reduce((acc, value) => acc + value, 0);
-    return sum / audioData.length / 255; // Normalize to 0-1
+    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteTimeDomainData(dataArray);
+    return dataArray;
   }
 
-  // Apply radio filter effects
-  setRadioFilter(enabled: boolean) {
-    if (!this.filterNode) return;
-
-    if (enabled) {
-      this.filterNode.frequency.value = 1000;
-      this.filterNode.Q.value = 2;
-    } else {
-      this.filterNode.frequency.value = 20000; // Pass through
-      this.filterNode.Q.value = 0.1;
+  // Volume controls
+  setVolume(volume: number): void {
+    this.config.volume = Math.max(0, Math.min(1, volume));
+    if (this.masterGainNode) {
+      this.masterGainNode.gain.value = this.config.volume;
     }
   }
 
-  // Set master volume
-  setVolume(volume: number) {
-    if (this.gainNode) {
-      this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+  setStaticVolume(volume: number): void {
+    this.config.staticVolume = Math.max(0, Math.min(1, volume));
+    if (this.staticGainNode) {
+      this.staticGainNode.gain.value = this.config.staticVolume;
     }
   }
 
-  // Play caller connection sequence
-  async playCallerConnection(_caller: Caller) {
-    // Phone ringing
-    this.playSound('phone_ring');
-    
-    // Wait a moment
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Connection sound
-    this.playSound('connect');
-    
-    // Static effect
-    this.playSound('static', { volume: 0.3, fadeIn: 0.5 });
+  setVoiceVolume(volume: number): void {
+    this.config.voiceVolume = Math.max(0, Math.min(1, volume));
   }
 
-  // Play caller disconnection
-  playCallerDisconnection() {
-    this.stopCurrentSpeech();
-    this.playSound('disconnect');
-    this.playSound('static', { volume: 0.2, fadeOut: 1.0 });
+  setEffectsVolume(volume: number): void {
+    this.config.effectsVolume = Math.max(0, Math.min(1, volume));
   }
 
-  // Play broadcast start
-  playBroadcastStart() {
-    this.playSound('broadcast_start', { volume: 0.8 });
+  // Get current config
+  getConfig(): AudioConfig {
+    return { ...this.config };
   }
 
-  // Play broadcast end
-  playBroadcastEnd() {
-    this.playSound('broadcast_end', { volume: 0.8 });
+  // Game-specific sound methods
+  playPhoneRing(): void {
+    this.playSound('phone_ring', 0.5);
   }
 
-  // Play UI interaction sounds
-  playButtonClick() {
-    this.playSound('button_click', { volume: 0.3 });
+  playDialTone(): void {
+    this.playSound('dial_tone', 0.3);
+  }
+
+  playCallerConnection(_caller: any): void {
+    this.playSound('connect', 0.4);
+    setTimeout(() => this.playStatic(), 100);
+  }
+
+  playCallerDisconnect(): void {
+    this.stopStatic();
+    this.playSound('disconnect', 0.5);
+  }
+
+  playBroadcastStart(): void {
+    this.playSound('broadcast_start', 0.6);
+  }
+
+  playBroadcastEnd(): void {
+    this.playSound('broadcast_end', 0.6);
+  }
+
+  playButtonClick(): void {
+    this.playSound('button_click', 0.3);
+  }
+
+  // Apply radio effects to audio
+  applyRadioEffect(intensity: number = 0.5): void {
+    if (!this.staticFilterNode) return;
+
+    // Adjust filter parameters based on intensity
+    this.staticFilterNode.frequency.value = 1850 + (intensity * 500);
+    this.staticFilterNode.Q.value = 1 + (intensity * 2);
   }
 
   // Cleanup
-  destroy() {
-    this.stopCurrentSpeech();
+  cleanup(): void {
+    this.stopStatic();
     
-    // Unload all sounds
-    this.sounds.forEach(sound => {
-      sound.unload();
-    });
-    this.sounds.clear();
-
-    // Close audio context
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
+    if (this.analyserNode) {
+      this.analyserNode.disconnect();
     }
+    
+    if (this.masterGainNode) {
+      this.masterGainNode.disconnect();
+    }
+
+    this.isInitialized = false;
+  }
+
+  // Resume audio context if suspended (for browser autoplay policies)
+  resumeAudioContext(): void {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+  }
+
+  // Check if audio is available
+  isAudioAvailable(): boolean {
+    return this.isInitialized && this.audioContext !== null;
   }
 }
 
