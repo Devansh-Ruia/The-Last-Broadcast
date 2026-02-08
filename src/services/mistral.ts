@@ -1,5 +1,8 @@
 import type { Caller, WorldState } from '../types';
 
+const MISTRAL_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
+console.info('[Mistral] API key loaded:', MISTRAL_KEY ? `${MISTRAL_KEY.slice(0, 8)}...` : 'MISSING');
+
 interface MistralResponse {
   choices: Array<{
     message: {
@@ -15,7 +18,7 @@ class MistralService {
   private hasLoggedMockMode = false;
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_MISTRAL_API_KEY || '';
+    this.apiKey = MISTRAL_KEY || '';
     this.baseUrl = 'https://api.mistral.ai/v1';
     this.isMockMode = !this.apiKey;
     
